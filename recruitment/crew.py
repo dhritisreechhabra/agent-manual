@@ -1,106 +1,93 @@
-from crewai import Agent, Crew, Process, Task
+from crewai import Agent, Crew, Process, Task, LLM
 from crewai.tools import tool
-from crewai.agents.agent_builder.base_agent import BaseAgent
-from typing import List
 from dotenv import load_dotenv
-from crewai import LLM
 import json
 
-# Local tools
 from .tools.linkedin_dummy import dummy_linkedin_search
 from .tools.matcher import simple_matcher
 from .tools.communicator import draft_outreach
 
 load_dotenv()
 
-llm = LLM(
-    model="gpt-4o-mini",
-    temperature=0.1
-)
+llm = LLM(model="gpt-4o-mini", temperature=0.1)
 
-# Define tool wrapper for CrewAI
 @tool
 def search_linkedin(query: str) -> str:
     """Fetch candidate profiles from the local dummy LinkedIn data."""
     profiles = dummy_linkedin_search(query, limit=10)
-    print(f"[Tool] search_linkedin called with query='{query}' → {len(profiles)} results")
     return json.dumps(profiles, indent=2)
 
-
 class RecruitmentCrew:
-    agents: List[BaseAgent]
-    tasks: List[Task]
-
-    def researcher(self) -> Agent:
+    def researcher(self):
         return Agent(
             role="Researcher",
-            goal="Find relevant candidate profiles from LinkedIn-like data using the local dummy dataset.",
-            backstory="You identify potential candidates that fit the given job description.",
-            verbose=True,
+            goal="Find relevant candidate profiles using dummy LinkedIn data.",
+            backstory="You search for suitable profiles for the given job title.",
             llm=llm,
-            tools=[search_linkedin]
+            tools=[search_linkedin],
+            verbose=True
         )
 
-    def matcher(self) -> Agent:
+    def matcher(self):
         return Agent(
             role="Matcher",
-            goal="Evaluate and score candidates based on job requirements.",
-            backstory="You analyze profiles and assign fit scores based on skills and experience.",
-            verbose=True,
+            goal="Evaluate and score candidates based on required skills.",
+            backstory="You analyze profiles and assign fit scores based on skills overlap.",
             llm=llm,
-            tools=[]
+            verbose=True
         )
 
-    def communicator(self) -> Agent:
+    def communicator(self):
         return Agent(
             role="Communicator",
-            goal="Draft personalized outreach emails to top candidates.",
-            backstory="You write professional and engaging messages to invite candidates for interviews.",
-            verbose=True,
+            goal="Draft outreach messages to top candidates.",
+            backstory="You create personalized outreach messages for suitable candidates.",
             llm=llm,
-            tools=[]
+            verbose=True
         )
 
-    def reporter(self) -> Agent:
+    def reporter(self):
         return Agent(
             role="Reporter",
-            goal="Summarize the final recruitment report for the hiring manager.",
-            backstory="You compile matched candidates and outreach drafts into a report.",
-            verbose=True,
+            goal="Compile the recruitment report.",
+            backstory="You summarize top candidates and their outreach drafts.",
             llm=llm,
-            tools=[]
+            verbose=True
         )
 
-    def run_flow(self, inputs: dict):
-        """Manual execution flow: researcher -> matcher -> communicator -> reporter."""
-        job = inputs.get("job")
-        if not job:
-            raise ValueError("Missing 'job' in inputs")
+    def crew(self):
+        researcher = self.researcher()
+        matcher = self.matcher()
+        communicator = self.communicator()
+        reporter = self.reporter()
 
-        print("\n=====  Recruitment Crew Execution Started =====")
+        research_task = Task(
+            description="Find potential candidates for Senior Backend Engineer (Python) using dummy LinkedIn data.",
+            expected_output="A list of candidate profiles matching the job query.",
+            agent=researcher
+        )
 
-        query = job.get("search_query", job.get("title", "engineer"))
-        print(f"\n🔍 Step 1: Researching candidates for query: {query}")
-        profiles = dummy_linkedin_search(query, limit=10)
-        print(f" Found {len(profiles)} profiles")
+        match_task = Task(
+            description="Match profiles to required skills and rate them based on fit.",
+            expected_output="A ranked list of candidates with match scores and reasons.",
+            agent=matcher
+        )
 
-        print("\n  Step 2: Matching candidates to requirements")
-        matches = simple_matcher(profiles, job.get("requirements", {}), top_n=5)
+        outreach_task = Task(
+            description="Draft personalized outreach messages for top candidates.",
+            expected_output="Drafted email subjects and bodies for each selected candidate.",
+            agent=communicator
+        )
 
-        print("\n💬 Step 3: Drafting outreach messages")
-        drafts = []
-        for m in matches:
-            candidate = m["profile"]
-            d = draft_outreach(candidate, job)
-            d["score"] = m["score"]
-            d["reasons"] = m["reasons"]
-            d["profile"] = candidate
-            drafts.append(d)
+        report_task = Task(
+            description="Summarize the recruitment process and produce a final report.",
+            expected_output="A structured recruitment summary containing shortlisted candidates and outreach drafts.",
+            agent=reporter
+        )
 
-        print("\n Step 4: Generating final report")
-        for d in drafts:
-            c = d['profile']
-            print(f"- {c['name']} ({c['title']}) | Score: {d['score']} | Skills: {', '.join(c['skills'])}")
-
-        print("\n===== Recruitment Flow Completed =====\n")
-        return {"top_candidates": drafts}
+        return Crew(
+            agents=[researcher, matcher, communicator, reporter],
+            tasks=[research_task, match_task, outreach_task, report_task],
+            process=Process.sequential,
+            verbose=True
+        )

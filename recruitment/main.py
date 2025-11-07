@@ -8,12 +8,13 @@ def run_demo():
     }
 
     rc = RecruitmentCrew()
-    result = rc.run_flow(inputs={"job": job})
+    crew = rc.crew()
+
+    # This triggers the full CrewAI orchestration with box-format logs
+    result = crew.kickoff(inputs={"job": job})
 
     print("\n===== Final Output =====")
-    for c in result["top_candidates"]:
-        print(f"{c['profile']['name']} - Score: {c['score']} | Subject: {c['subject']}")
-        print(f"Message:\n{c['body']}\n")
+    print(result)
 
 if __name__ == "__main__":
     run_demo()
