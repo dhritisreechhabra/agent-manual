@@ -1,7 +1,7 @@
 def draft_outreach(candidate, job):
     name = candidate["name"]
     title = candidate["title"]
-    job_title = job["title"]
+    job_title = job["Python Engineer"]
 
     subject = f"Opportunity for {job_title}"
     body = (

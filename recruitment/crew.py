@@ -2,18 +2,18 @@ from crewai import Agent, Crew, Process, Task, LLM
 from crewai.tools import tool
 from dotenv import load_dotenv
 import json
-
+ 
 from .tools.linkedin_dummy import dummy_linkedin_search
 from .tools.matcher import simple_matcher
 from .tools.communicator import draft_outreach
-
+ 
 load_dotenv()
-
-llm = LLM(model="gpt-4o-mini", temperature=0.1)
+ 
+llm = LLM(model="gemini/gemini-2.0-flash", temperature=0.1)
 
 @tool
 def search_linkedin(query: str) -> str:
-    """Fetch candidate profiles from the local dummy LinkedIn data."""
+    """Search candidates in the local LinkedIn-style dataset."""
     profiles = dummy_linkedin_search(query, limit=10)
     return json.dumps(profiles, indent=2)
 
@@ -21,8 +21,8 @@ class RecruitmentCrew:
     def researcher(self):
         return Agent(
             role="Researcher",
-            goal="Find relevant candidate profiles using dummy LinkedIn data.",
-            backstory="You search for suitable profiles for the given job title.",
+            goal="Find relevant candidate profiles.",
+            backstory="You locate candidates based on job inputs.",
             llm=llm,
             tools=[search_linkedin],
             verbose=True
@@ -31,8 +31,8 @@ class RecruitmentCrew:
     def matcher(self):
         return Agent(
             role="Matcher",
-            goal="Evaluate and score candidates based on required skills.",
-            backstory="You analyze profiles and assign fit scores based on skills overlap.",
+            goal="Score and rank candidate profiles.",
+            backstory="You compare skills and compute fit.",
             llm=llm,
             verbose=True
         )
@@ -40,8 +40,8 @@ class RecruitmentCrew:
     def communicator(self):
         return Agent(
             role="Communicator",
-            goal="Draft outreach messages to top candidates.",
-            backstory="You create personalized outreach messages for suitable candidates.",
+            goal="Draft outreach messages.",
+            backstory="You write outreach content for candidates.",
             llm=llm,
             verbose=True
         )
@@ -49,8 +49,8 @@ class RecruitmentCrew:
     def reporter(self):
         return Agent(
             role="Reporter",
-            goal="Compile the recruitment report.",
-            backstory="You summarize top candidates and their outreach drafts.",
+            goal="Prepare the final recruitment summary.",
+            backstory="You produce the final consolidated report.",
             llm=llm,
             verbose=True
         )
@@ -61,33 +61,33 @@ class RecruitmentCrew:
         communicator = self.communicator()
         reporter = self.reporter()
 
-        research_task = Task(
-            description="Find potential candidates for Senior Backend Engineer (Python) using dummy LinkedIn data.",
-            expected_output="A list of candidate profiles matching the job query.",
+        task1 = Task(
+            description="Search for candidates for Senior Backend Engineer (Python).",
+            expected_output="List of candidate profiles.",
             agent=researcher
         )
 
-        match_task = Task(
-            description="Match profiles to required skills and rate them based on fit.",
-            expected_output="A ranked list of candidates with match scores and reasons.",
+        task2 = Task(
+            description="Match and score retrieved profiles based on required skills.",
+            expected_output="Ranked candidates with match scores.",
             agent=matcher
         )
 
-        outreach_task = Task(
-            description="Draft personalized outreach messages for top candidates.",
-            expected_output="Drafted email subjects and bodies for each selected candidate.",
+        task3 = Task(
+            description="Draft outreach emails for the top candidates.",
+            expected_output="Email subjects and bodies.",
             agent=communicator
         )
 
-        report_task = Task(
-            description="Summarize the recruitment process and produce a final report.",
-            expected_output="A structured recruitment summary containing shortlisted candidates and outreach drafts.",
+        task4 = Task(
+            description="Produce the final recruitment report.",
+            expected_output="Final structured summary.",
             agent=reporter
         )
 
         return Crew(
             agents=[researcher, matcher, communicator, reporter],
-            tasks=[research_task, match_task, outreach_task, report_task],
+            tasks=[task1, task2, task3, task4],
             process=Process.sequential,
             verbose=True
         )

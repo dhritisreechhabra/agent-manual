@@ -10,7 +10,6 @@ def run_demo():
     rc = RecruitmentCrew()
     crew = rc.crew()
 
-    # This triggers the full CrewAI orchestration with box-format logs
     result = crew.kickoff(inputs={"job": job})
 
     print("\n===== Final Output =====")
